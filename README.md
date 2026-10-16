@@ -1,6 +1,6 @@
 # تحصيلي فيزياء 2 — مدرسة الخويلدية الثانوية
 
-موقع اختبار ومسابقات فيزياء 2 (إعداد الأستاذ حسن الراهب)، مع قاعدة بيانات تسجّل:
+موقع اختبار ومسابقات فيزياء 2 (إعداد الأستاذ حسن الراهب)، مع قاعدة بيانات على **Railway** تسجّل:
 
 - **كل من دخل الموقع** (وقت الدخول، نوع الجهاز، رقم مميز لكل جهاز).
 - **بدء كل اختبار** (اسم الطالب أو أسماء الفرق والوحدات المختارة).
@@ -11,40 +11,41 @@
 |---|---|
 | `index.html` | صفحة الاختبار للطلاب |
 | `admin.html` | لوحة المعلم: الطلاب، المحاولات، سجل الزيارات، تنزيل Excel |
-| `config.js` | رابط قاعدة البيانات ومفتاحها |
-| `db.js` | إرسال الزيارات والنتائج لقاعدة البيانات |
-| `supabase/schema.sql` | إنشاء الجداول وقواعد الأمان |
+| `server.js` | الخادم: يعرض الصفحات ويحفظ البيانات في PostgreSQL (ينشئ الجداول تلقائيًا) |
+| `db.js` | إرسال الزيارات والنتائج من المتصفح إلى الخادم |
+| `config.js` | رابط الخادم (يُستخدم فقط عند فتح الموقع من GitHub Pages) |
 
-## الخطوة 1: نشر الموقع على GitHub Pages
+## ربط Railway بـ GitHub (مرة واحدة)
 
-1. في المستودع على GitHub افتح **Settings ← Pages**.
-2. في **Source** اختر **Deploy from a branch**، ثم الفرع `main` والمجلد `/ (root)` واضغط **Save**.
-3. بعد دقيقة يظهر الرابط: `https://halraheb.github.io/New-website/`
-   ولوحة المعلم: `https://halraheb.github.io/New-website/admin.html`
+1. ادخل [railway.com](https://railway.com) واضغط **Login** ← **Login with GitHub**.
+2. اضغط **New Project** ← **Deploy from GitHub repo**.
+   - أول مرة: اضغط **Configure GitHub App** واسمح لـ Railway بالوصول إلى المستودع `New-website`.
+3. اختر `Halraheb/New-website`، وسيبدأ النشر تلقائيًا.
+4. داخل المشروع اضغط **+ Create** (أو **New**) ← **Database** ← **Add PostgreSQL**.
+5. اضغط على خدمة الموقع (`New-website`) ← تبويب **Variables** ← أضف:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (اخترها من قائمة **Add Reference**)
+   - `ADMIN_PASSWORD` = كلمة مرور تختارها للوحة المعلم
+6. تبويب **Settings** ← **Networking** ← **Generate Domain**. هذا رابط موقعك، مثل:
+   `https://new-website-production.up.railway.app`
+   - لوحة المعلم: نفس الرابط + `/admin`
 
-## الخطوة 2: إنشاء قاعدة البيانات (Supabase — مجاني)
+بعدها كل تعديل يُرفع إلى فرع `main` في GitHub يُنشر تلقائيًا على Railway.
 
-1. سجّل في [supabase.com](https://supabase.com) وأنشئ مشروعًا جديدًا (**New project**).
-2. افتح **SQL Editor ← New query**، والصق محتوى `supabase/schema.sql` كاملًا واضغط **Run**.
-3. أنشئ حساب المعلم: **Authentication ← Users ← Add user ← Create new user** (بريد وكلمة مرور، وفعّل *Auto Confirm User*).
-4. في **SQL Editor** شغّل هذا السطر ببريدك نفسه:
-   ```sql
-   insert into public.teachers (email) values ('بريدك@example.com');
-   ```
-5. (يُنصح به) **Authentication ← Sign In / Providers**: أوقف *Allow new users to sign up*.
-6. من **Project Settings ← API** انسخ **Project URL** و **anon public key** وضعهما في `config.js`:
-   ```js
-   window.APP_CONFIG = {
-     SUPABASE_URL: "https://xxxx.supabase.co",
-     SUPABASE_ANON_KEY: "eyJhbGciOi..."
-   };
-   ```
-   (يمكن تعديل الملف مباشرة من GitHub بالضغط على أيقونة القلم ثم **Commit changes**.)
+## إذا أردت استخدام رابط GitHub Pages أيضًا
+
+يعمل الموقع على `https://halraheb.github.io/New-website/`، لكنه يحتاج معرفة رابط الخادم:
+ضع رابط Railway في `config.js`:
+
+```js
+window.APP_CONFIG = { API_URL: "https://new-website-production.up.railway.app" };
+```
 
 ## الأمان
 
-- المفتاح `anon` عام بطبيعته ويُوضع في المتصفح.
-- قواعد الأمان (RLS) تسمح للزوار **بالإضافة فقط**، ولا يستطيع أحد **قراءة** البيانات إلا المعلم المسجّل بريده في جدول `teachers`.
-- يمكنك أيضًا رؤية الجداول مباشرة من **Supabase ← Table Editor** (`visits` و `attempts`).
+- لا يستطيع أحد قراءة البيانات إلا بكلمة مرور المعلم (`ADMIN_PASSWORD`)، وهي محفوظة في Railway وليست في الكود.
+- الخادم يحدّ من عدد الطلبات ويقصّ أي بيانات طويلة، ولا يُعرض من ملفاته إلا صفحات الموقع.
+- عناوين IP لا تُحفظ كما هي، بل بصيغة مشفّرة (hash).
 
-إذا لم تُضبط `config.js` يعمل الموقع عاديًا وتُحفظ النتائج على جهاز الطالب فقط.
+## ملاحظة عن التكلفة
+
+Railway يعطي رصيدًا تجريبيًا عند التسجيل، وبعده تحتاج خطة **Hobby** (حوالي 5 دولارات شهريًا) ليبقى الموقع وقاعدة البيانات يعملان.

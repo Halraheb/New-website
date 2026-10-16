@@ -1,10 +1,10 @@
-// تسجيل الزيارات ونتائج الطلاب في Supabase عبر REST، بدون مكتبات خارجية.
-// إذا لم تُضبط config.js يعمل الموقع عاديًا وتُحفظ النتائج على الجهاز فقط.
+// تسجيل الزيارات ونتائج الطلاب في قاعدة بيانات الخادم (Railway).
+// إذا لم يتوفر الخادم يعمل الموقع عاديًا وتُحفظ النتائج على الجهاز فقط.
 (function(){
   const cfg = window.APP_CONFIG || {};
-  const URL_ = (cfg.SUPABASE_URL || "").replace(/\/+$/, "");
-  const KEY = cfg.SUPABASE_ANON_KEY || "";
-  const enabled = !!(URL_ && KEY);
+  const onPages = /\.github\.io$/.test(location.hostname) || location.protocol === "file:";
+  const API = (cfg.API_URL || (onPages ? "" : location.origin)).replace(/\/+$/, "");
+  const enabled = !!API;
 
   function visitorId(){
     const k = "khuwaildiya-visitor";
@@ -16,14 +16,12 @@
   }
   const VID = visitorId();
 
-  async function insert(table, row){
+  async function post(path, row){
     if(!enabled) return false;
     try{
-      const r = await fetch(`${URL_}/rest/v1/${table}`, {
-        method: "POST",
-        headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify(row),
-        keepalive: true
+      const r = await fetch(API + path, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(row), keepalive: true
       });
       return r.ok;
     }catch(e){ return false; }
@@ -31,10 +29,10 @@
   const cut = (v, n) => v == null ? null : String(v).slice(0, n);
 
   window.DB = {
-    enabled,
+    enabled, api: API,
     visitorId: VID,
     logEvent(event, o = {}){
-      return insert("visits", {
+      return post("/api/visits", {
         visitor_id: VID, event,
         name: cut(o.name, 60), mode: cut(o.mode, 20),
         details: o.details || null,
@@ -46,7 +44,7 @@
       });
     },
     saveAttempt(a){
-      return insert("attempts", {
+      return post("/api/attempts", {
         client_id: cut(a.id, 60), visitor_id: VID,
         name: cut(a.name || "طالب", 60),
         units: a.units || [], correct: a.correct|0, total: a.total|0, pct: a.pct|0,

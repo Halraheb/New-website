@@ -81,14 +81,13 @@ footer{color:var(--muted);font-size:.8rem;padding-block:18px 28px}
 <main class="wrap">
   <section id="setupMsg" class="panel login" hidden>
     <h2>قاعدة البيانات غير مفعّلة</h2>
-    <p class="muted">أضف رابط مشروع Supabase والمفتاح anon في ملف <code>config.js</code> ثم أعد تحميل الصفحة. الخطوات في ملف README.</p>
+    <p class="muted">افتح لوحة المعلم من رابط Railway، أو ضع رابط Railway في <code>config.js</code> (API_URL). الخطوات في ملف README.</p>
   </section>
 
   <section id="login" class="panel login" hidden>
     <h2 style="margin-bottom:14px">تسجيل دخول المعلم</h2>
     <form id="loginForm">
-      <div class="field"><label for="email">البريد الإلكتروني</label><input id="email" type="email" autocomplete="username" required dir="ltr"></div>
-      <div class="field"><label for="pass">كلمة المرور</label><input id="pass" type="password" autocomplete="current-password" required dir="ltr"></div>
+      <div class="field"><label for="pass">كلمة مرور المعلم</label><input id="pass" type="password" autocomplete="current-password" required dir="ltr"></div>
       <button class="btn primary" id="loginBtn">دخول</button>
       <div class="msg" id="loginMsg" aria-live="polite"></div>
     </form>
@@ -120,8 +119,10 @@ footer{color:var(--muted);font-size:.8rem;padding-block:18px 28px}
 const TOPICS={g:"الجاذبية",r:"الحركة الدورانية",m:"الاتزان والدفع والزخم",w:"الشغل والطاقة",p:"القدرة والآلات",h:"الحرارة"};
 const EVENTS={visit:"دخول الموقع",start:"بدء اختبار",team_finish:"نهاية مسابقة فرق"};
 const $=id=>document.getElementById(id);
-const cfg=window.APP_CONFIG||{}, BASE=(cfg.SUPABASE_URL||"").replace(/\/+$/,""), KEY=cfg.SUPABASE_ANON_KEY||"";
-const SKEY="khuwaildiya-teacher-session";
+const cfg=window.APP_CONFIG||{};
+const onPages=/\.github\.io$/.test(location.hostname)||location.protocol==="file:";
+const API=(cfg.API_URL||(onPages?"":location.origin)).replace(/\/+$/,"");
+const SKEY="khuwaildiya-teacher-pass";
 let session=null, data={attempts:[],visits:[]}, tab="students";
 
 function level(p){return p>=90?"ممتاز":p>=80?"جيد جدًا":p>=65?"جيد":p>=50?"مقبول":"يحتاج دعم"}
@@ -131,39 +132,20 @@ function units(u){if(!Array.isArray(u)||!u.length||u.length>=6)return "كل ال
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function device(ua){ua=ua||"";return /iPhone|iPad/.test(ua)?"iPhone/iPad":/Android/.test(ua)?"Android":/Windows/.test(ua)?"Windows":/Mac OS/.test(ua)?"Mac":/CrOS/.test(ua)?"Chromebook":/Linux/.test(ua)?"Linux":"غير معروف"}
 
-function loadSession(){try{return JSON.parse(sessionStorage.getItem(SKEY))}catch(e){return null}}
-function storeSession(s){session=s;try{s?sessionStorage.setItem(SKEY,JSON.stringify(s)):sessionStorage.removeItem(SKEY)}catch(e){}}
-
-async function auth(body,grant){
-  const r=await fetch(`${BASE}/auth/v1/token?grant_type=${grant}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"application/json"},body:JSON.stringify(body)});
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(j.error_description||j.msg||"تعذّر تسجيل الدخول");
-  return {access_token:j.access_token,refresh_token:j.refresh_token,expires_at:Date.now()+(j.expires_in||3600)*1000};
-}
-async function token(){
-  if(session&&session.expires_at-Date.now()<60000){
-    try{storeSession(await auth({refresh_token:session.refresh_token},"refresh_token"))}catch(e){storeSession(null)}
-  }
-  return session&&session.access_token;
-}
-async function fetchAll(table){
-  const out=[];const page=1000;
-  for(let from=0;;from+=page){
-    const t=await token(); if(!t)throw new Error("auth");
-    const r=await fetch(`${BASE}/rest/v1/${table}?select=*&order=created_at.desc`,{headers:{apikey:KEY,Authorization:`Bearer ${t}`,Range:`${from}-${from+page-1}`}});
-    if(r.status===401)throw new Error("auth");
-    if(!r.ok)throw new Error((await r.text())||r.statusText);
-    const rows=await r.json();out.push(...rows);
-    if(rows.length<page)return out;
-  }
+function loadSession(){try{return sessionStorage.getItem(SKEY)}catch(e){return null}}
+function storeSession(v){session=v;try{v?sessionStorage.setItem(SKEY,v):sessionStorage.removeItem(SKEY)}catch(e){}}
+async function fetchData(pass){
+  const r=await fetch(`${API}/api/admin/data`,{headers:{Authorization:`Bearer ${pass}`}});
+  if(r.status===401)throw new Error("auth");
+  if(!r.ok)throw new Error(r.statusText||String(r.status));
+  return r.json();
 }
 
 async function load(){
   $("info").textContent="جارٍ التحميل…";
   try{
-    const [attempts,visits]=await Promise.all([fetchAll("attempts"),fetchAll("visits")]);
-    data={attempts,visits};
-    if(!attempts.length&&!visits.length)$("info").textContent="لا توجد بيانات. إذا كان الطلاب قد دخلوا الموقع فتأكد أن بريدك مضاف في جدول teachers.";
+    data=await fetchData(session);
+    if(!data.attempts.length&&!data.visits.length)$("info").textContent="لا توجد بيانات بعد.";
     else $("info").textContent=`آخر تحديث: ${fmt(Date.now())}`;
     render();
   }catch(e){
@@ -240,7 +222,7 @@ function csv(){
 }
 
 function show(){
-  const ok=!!(BASE&&KEY);
+  const ok=!!API;
   $("setupMsg").hidden=ok;
   $("login").hidden=!ok||!!session;
   $("dash").hidden=!ok||!session;
@@ -248,8 +230,9 @@ function show(){
 }
 $("loginForm").onsubmit=async ev=>{
   ev.preventDefault();const m=$("loginMsg");m.className="msg";m.textContent="";$("loginBtn").disabled=true;
-  try{storeSession(await auth({email:$("email").value.trim(),password:$("pass").value},"password"));$("pass").value="";show();}
-  catch(e){m.className="msg bad";m.textContent=/Invalid login/i.test(e.message)?"البريد أو كلمة المرور غير صحيحة.":e.message;}
+  const pass=$("pass").value;
+  try{data=await fetchData(pass);storeSession(pass);$("pass").value="";show();}
+  catch(e){m.className="msg bad";m.textContent=e.message==="auth"?"كلمة المرور غير صحيحة.":"تعذّر الاتصال بالخادم: "+e.message;}
   finally{$("loginBtn").disabled=false;}
 };
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",x===b));render();});
