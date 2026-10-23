@@ -9,7 +9,7 @@ const escA=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const unitName=k=>TOPICS[k]||k;
 
 function barRow(label,r,sub){
-  const p=pctOf(r), b=r.answered<MIN_ANSWERS?{c:"var(--chalk-dim)",t:"بيانات قليلة",i:"○"}:band(p);
+  const p=pctOf(r), b=r.answered<MIN_ANSWERS?{c:"var(--border-strong)",t:"بيانات قليلة",i:"○"}:band(p);
   return `<div class="hrow" title="${escA(label)}: ${r.correct} صحيحة من ${r.answered} (${p}%)">
     <span class="hl">${escA(label)}${sub?`<small>${escA(sub)}</small>`:""}</span>
     <span class="hbar"><i style="width:${Math.max(p,1)}%;background:${b.c}"></i></span>
