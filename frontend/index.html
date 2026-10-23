@@ -7,6 +7,7 @@
 <script>try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/shell.css">
 <style>:root{box-sizing:border-box}body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <style>
@@ -44,7 +45,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .school{font-size:.95rem;opacity:.85}
 .credits{display:flex;gap:6px 22px;flex-wrap:wrap;font-size:.88rem}
 .credits div{display:flex;flex-direction:column}
-.credits small{opacity:.6;font-size:.72rem;letter-spacing:.02em}
+.credits small{opacity:.7;font-size:.75rem}
 .credits b{font-weight:600}
 .orbit{position:absolute;inset-inline-start:-60px;top:-70px;width:340px;opacity:.18;pointer-events:none}
 
@@ -164,7 +165,7 @@ table.rec{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;
 .unit[aria-pressed="true"]{border-color:var(--accent);background:var(--surface)}
 .unit[aria-pressed="true"] small{color:var(--accent)}
 .unit.all{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center}
-.explain{margin-top:16px;padding:14px 16px;border-radius:12px;background:var(--bg);border:1px solid var(--line);border-inline-start:4px solid var(--accent)}
+.explain{margin-top:16px;padding:14px 16px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
 .explain b{font-family:var(--display);font-size:.95rem;color:var(--accent)}
 .explain p{margin:6px 0 0;font-size:clamp(1rem,1.7vw,1.15rem);line-height:1.8;unicode-bidi:plaintext}
 .review .re{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);font-size:.92rem;line-height:1.8}
@@ -296,6 +297,7 @@ footer{color:var(--muted);font-size:.8rem;padding-block:18px 28px}
 <footer class="wrap">الأسئلة مختارة من تجميعات تحصيلي الفيزياء (أعوام 2020–2025).</footer>
 </div>
 
+<script src="/site.js"></script>
 <script src="/common.js"></script>
 <script src="/questions.js"></script>
 <script>
@@ -538,15 +540,18 @@ async function saveResult(){
   if(!done){msg.textContent="لم تُجب عن أي سؤال، فلم تُحفظ نتيجة.";return;}
   try{
     const d=await api("/api/results",{method:"POST",body:JSON.stringify({score:solo.correct,total:done,units:solo.units,answers:solo.answers})});
-    msg.innerHTML=`حُفظت نتيجتك في حسابك ✓ · <a href="/profile.html">عرض ملفي وإنجازاتي</a>`;
+    msg.innerHTML=`${icon("check",18)} حُفظت نتيجتك في حسابك · <a href="/profile.html">عرض ملفي وإنجازاتي</a>`;
     const nb=d.new_achievements||[];
     if(nb.length){
       box.hidden=false;
-      box.innerHTML=`<h3 style="grid-column:1/-1">🏅 إنجازات جديدة!</h3>`+nb.map(badgeHTML).join("");
-      const xp=nb.reduce((t,a)=>t+a.xp,0);
-      toast(`<span class="ico">${nb[0].icon}</span><div><b>${nb.length>1?`${nb.length} إنجازات جديدة`:"إنجاز جديد: "+esc(nb[0].title)}</b><br><small class="dim" dir="ltr">+${xp} XP</small></div>`);
+      box.innerHTML=`<h3 style="grid-column:1/-1;display:flex;gap:8px;align-items:center">${icon("trophy",22)}إنجازات جديدة</h3>`+nb.map(badgeHTML).join("");
+      achToast(nb);
     }
-  }catch(e){msg.textContent="تعذّر حفظ النتيجة: "+e.message;}
+  }catch(e){
+    if(e.message==="401")return;
+    msg.innerHTML=`${icon("alert",18)} لم تُحفظ النتيجة: ${esc(e.message)} <button class="btn ghost" type="button" id="retrySave" style="margin-inline-start:8px">${icon("refresh",16)} أعد الحفظ</button>`;
+    $("retrySave").onclick=saveResult;
+  }
 }
 
 $("nTeams").onchange=renderTeamInputs;

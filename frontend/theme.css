@@ -1,0 +1,32 @@
+@import url("https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap");
+/* تحصيلي فيزياء 2 — brand tokens only. Everything else lives in shell.css / style.css, shared with the aptitude site.
+   One accent (navy in light, gold in dark), neutrals for everything else, status colours always paired with an icon + label. */
+:root{
+  --bg:#F4F6FA; --surface:#FFFFFF; --surface-2:#EEF1F6; --border:#DCE2EB; --border-strong:#C3CCD9;
+  --text:#14203A; --muted:#55617A;
+  --brand:#1F3A68; --brand-ink:#FFFFFF; --brand-soft:#E4EAF4; --hero:#14203A; --hero-ink:#F2F5FA; --hero-accent:#F2B33D;
+  --ok:#17844B; --warn:#966000; --bad:#C23B2E;
+  --t1:#2F6FD6; --t2:#C2410C; --t3:#0F8A7E; --t4:#8B3FB8;
+  --bronze:#A8622F; --silver:#6E7B88; --gold:#B88A0B;
+  --display:"Readex Pro","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1526; --surface:#151F36; --surface-2:#1B2742; --border:rgb(255 255 255/.09); --border-strong:rgb(255 255 255/.18);
+  --text:#E8EDF6; --muted:#9DA9C2;
+  --brand:#F2B33D; --brand-ink:#24180A; --brand-soft:#3A2F17; --hero:#0A1020; --hero-ink:#E8EDF6; --hero-accent:#F2B33D;
+  --ok:#4CC587; --warn:#F2B33D; --bad:#F07368;
+  --t1:#6FA2F5; --t2:#F08A4B; --t3:#3FC2B2; --t4:#C08AE6;
+  --bronze:#D08A57; --silver:#A9B5BF; --gold:#F0C24B;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0E1526; --surface:#151F36; --surface-2:#1B2742; --border:rgb(255 255 255/.09); --border-strong:rgb(255 255 255/.18);
+  --text:#E8EDF6; --muted:#9DA9C2;
+  --brand:#F2B33D; --brand-ink:#24180A; --brand-soft:#3A2F17; --hero:#0A1020; --hero-ink:#E8EDF6; --hero-accent:#F2B33D;
+  --ok:#4CC587; --warn:#F2B33D; --bad:#F07368;
+  --t1:#6FA2F5; --t2:#F08A4B; --t3:#3FC2B2; --t4:#C08AE6;
+  --bronze:#D08A57; --silver:#A9B5BF; --gold:#F0C24B;
+  color-scheme:dark;
+}
