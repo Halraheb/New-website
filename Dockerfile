@@ -4,5 +4,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY . .
-CMD ["node", "server.js"]
+COPY backend ./backend
+COPY frontend ./frontend
+CMD ["node", "backend/server.js"]

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة المعلم · تحصيلي فيزياء 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/shell.css">
+<link rel="stylesheet" href="/style.css">
+<script>try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<header class="nav" id="nav"></header>
+<main class="app">
+  <div class="page-head"><div><h1>لوحة المعلم</h1><p>التحليلات، سجل الطلاب، الدرجات، وإدارة المستخدمين</p></div><a class="ghost" href="/">ابدأ مسابقة فرق</a></div>
+  <div id="view" class="stack"></div>
+</main>
+<script src="/common.js"></script>
+<script src="/questions.js"></script>
+<script src="/analytics.js"></script>
+<script>
+const pctColor=p=>p>=90?"var(--right)":p>=60?"var(--saffron)":"var(--wrong)";
+const fmt=fmtDate;
+let TAB="analytics";
+
+function statsHTML(rows){
+  const n=rows.length, avg=n?Math.round(rows.reduce((a,r)=>a+r.percent,0)/n):0, best=n?Math.max(...rows.map(r=>r.percent)):0;
+  return `<div class="stats"><div class="stat"><span>عدد المحاولات</span><b>${n}</b></div>
+  <div class="stat"><span>متوسط النسبة</span><b>${avg}%</b></div><div class="stat"><span>أعلى نسبة</span><b>${best}%</b></div></div>`;
+}
+function resultsTable(rows,withStudent){
+  if(!rows.length)return `<div class="tbl"><div class="empty">لا توجد درجات بعد.</div></div>`;
+  return `<div class="tbl"><table><thead><tr>${withStudent?"<th>الطالب</th><th>الصف</th>":""}<th>الدرجة</th><th>النسبة</th><th>الوحدات</th><th>التاريخ</th>${ME.role!=="student"?"<th></th>":""}</tr></thead><tbody>
+  ${rows.map(r=>`<tr>${withStudent?`<td>${esc(r.full_name)} <small style="color:var(--chalk-dim)" dir="ltr">@${esc(r.username)}</small></td><td>${esc(r.class_name||"—")}</td>`:""}
+   <td>${r.score} / ${r.total}</td><td class="pct" style="color:${pctColor(r.percent)}">${r.percent}%</td><td>${esc(unitsLabel(r.units))}</td><td>${fmt(r.created_at)}</td>
+   ${ME.role!=="student"?`<td><button class="mini danger" data-delres="${r.id}">حذف</button></td>`:""}</tr>`).join("")}
+  </tbody></table></div>`;
+}
+
+async function staff(){
+  $("view").innerHTML=`<div class="tabs"><button data-t="analytics" aria-pressed="${TAB==="analytics"}">التحليلات</button><button data-t="students" aria-pressed="${TAB==="students"}">سجل الطلاب</button><button data-t="results" aria-pressed="${TAB==="results"}">درجات الطلاب</button><button data-t="users" aria-pressed="${TAB==="users"}">المستخدمون</button><button data-t="legacy" aria-pressed="${TAB==="legacy"}">السجل القديم</button></div><div id="pane"></div>`;
+  $("view").querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;staff();});
+  TAB==="analytics"?await staffAnalytics():TAB==="students"?await staffStudents():TAB==="results"?await staffResults():TAB==="legacy"?await staffLegacy():await staffUsers();
+}
+
+// Manual roster: staff enter each student's name, grade (out of 100) and progress (0–100%).
+const PROG=p=>p>=100?"مكتمل":p>=75?"متقدم":p>=50?"جيد":p>=25?"قيد التقدم":"بداية";
+const progColor=p=>p>=75?"var(--right)":p>=40?"var(--saffron)":"var(--wrong)";
+let SQ={q:"",cls:""}, EDIT=null;
+async function staffStudents(){
+  const {students}=await api("/api/admin/students");
+  const classes=[...new Set(students.map(s=>s.class_name).filter(Boolean))].sort();
+  const e=EDIT&&students.find(s=>s.id===EDIT)||null;
+  $("pane").innerHTML=`<div style="display:flex;flex-direction:column;gap:14px">
+  <form class="panel" id="sf"><h3>${e?"تعديل بيانات الطالب":"إضافة طالب"}</h3><div class="grid2">
+    <div class="field"><label>اسم الطالب</label><input name="full_name" required maxlength="80" value="${esc(e?.full_name)}"></div>
+    <div class="field"><label>الصف / الشعبة</label><input name="class_name" maxlength="40" list="clsList" value="${esc(e?.class_name)}"><datalist id="clsList">${classes.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
+    <div class="field"><label>الدرجة (من 100)</label><input name="grade" type="number" min="0" max="100" step="0.5" dir="ltr" value="${e?.grade??""}"></div>
+    <div class="field"><label>مستوى التقدم: <b id="pv"></b></label><input name="progress" type="range" min="0" max="100" step="5" value="${e?.progress??0}"></div>
+    <div class="field" style="grid-column:1/-1"><label>ملاحظات</label><input name="notes" maxlength="300" value="${esc(e?.notes)}"></div>
+  </div><div class="msg" id="sMsg"></div>
+  <div class="row"><button class="primary" type="submit">${e?"حفظ التعديل":"إضافة الطالب"}</button>${e?'<button class="btn" type="button" id="cancel">إلغاء</button>':""}</div></form>
+  <div class="tools"><input id="sq" placeholder="ابحث باسم الطالب" value="${esc(SQ.q)}">
+   <select id="scls"><option value="">كل الصفوف</option>${classes.map(c=>`<option ${c===SQ.cls?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
+  <div id="slist" style="display:flex;flex-direction:column;gap:14px"></div></div>`;
+  const f=$("sf"), pv=()=>$("pv").textContent=`${f.progress.value}% · ${PROG(+f.progress.value)}`;
+  f.progress.oninput=pv; pv();
+  if(e){f.scrollIntoView({block:"start"});$("cancel").onclick=()=>{EDIT=null;staffStudents();};}
+  f.onsubmit=async ev=>{ev.preventDefault();const fd=Object.fromEntries(new FormData(f));
+    try{await api("/api/admin/students"+(e?"/"+e.id:""),{method:e?"PUT":"POST",body:JSON.stringify(fd)});EDIT=null;staffStudents();}
+    catch(err){$("sMsg").style.color="var(--wrong)";$("sMsg").textContent=err.message;}};
+  const draw=()=>{
+    const q=SQ.q.toLowerCase();
+    const rows=students.filter(s=>(!SQ.cls||s.class_name===SQ.cls)&&(!q||s.full_name.toLowerCase().includes(q)));
+    const graded=rows.filter(s=>s.grade!=null), avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):0;
+    $("slist").innerHTML=`<div class="stats"><div class="stat"><span>عدد الطلاب</span><b>${rows.length}</b></div>
+      <div class="stat"><span>متوسط الدرجات</span><b>${graded.length?avg(graded.map(s=>s.grade)):"—"}</b></div>
+      <div class="stat"><span>متوسط التقدم</span><b>${avg(rows.map(s=>s.progress))}%</b></div></div>`+
+      (rows.length?`<div class="tbl"><table><thead><tr><th>الطالب</th><th>الصف</th><th>الدرجة</th><th>مستوى التقدم</th><th>ملاحظات</th><th></th></tr></thead><tbody>
+      ${rows.map(s=>`<tr><td>${esc(s.full_name)}</td><td>${esc(s.class_name||"—")}</td>
+        <td class="pct" style="color:${s.grade==null?"inherit":pctColor(s.grade)}">${s.grade==null?"—":s.grade}</td>
+        <td><div class="prog"><div class="bar"><i style="width:${s.progress}%;background:${progColor(s.progress)}"></i></div><small>${s.progress}% · ${PROG(s.progress)}</small></div></td>
+        <td style="color:var(--chalk-dim)">${esc(s.notes||"")}</td>
+        <td style="white-space:nowrap"><button class="mini" data-ed="${s.id}">تعديل</button> <button class="mini danger" data-dels="${s.id}">حذف</button></td></tr>`).join("")}
+      </tbody></table></div>`:`<div class="tbl"><div class="empty">لا يوجد طلاب بعد. أضف أول طالب من النموذج أعلاه.</div></div>`);
+    $("slist").querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{EDIT=+b.dataset.ed;staffStudents();});
+    $("slist").querySelectorAll("[data-dels]").forEach(b=>b.onclick=async()=>{if(!confirm("حذف هذا الطالب من السجل؟"))return;
+      try{await api("/api/admin/students/"+b.dataset.dels,{method:"DELETE"});if(EDIT===+b.dataset.dels)EDIT=null;staffStudents();}catch(err){alert(err.message);}});
+  };
+  $("sq").oninput=ev=>{SQ.q=ev.target.value;draw();};
+  $("scls").onchange=ev=>{SQ.cls=ev.target.value;draw();};
+  draw();
+}
+
+// Skills analytics: whole school, one stage, or one student.
+let AQ={stage:"all",user:""};
+async function staffAnalytics(){
+  const {users}=await api("/api/admin/users");
+  const studs=users.filter(u=>u.role==="student"&&(AQ.stage==="all"||(u.stage||"")===AQ.stage));
+  if(AQ.user&&!studs.some(u=>String(u.id)===AQ.user))AQ.user="";
+  const qs=AQ.user?`user_id=${AQ.user}`:AQ.stage==="all"?"":`stage=${encodeURIComponent(AQ.stage)}`;
+  const d=await api("/api/admin/analytics?"+qs);
+  const title=AQ.user?`تحليل الطالب: ${esc(d.student?.full_name)}${d.student?.stage?` · ${esc(d.student.stage)}`:""}`:AQ.stage==="all"?"تحليل المدرسة ككل":`تحليل المرحلة: ${esc(AQ.stage||"غير محدد")}`;
+  $("pane").innerHTML=`<div style="display:flex;flex-direction:column;gap:14px">
+    <div class="tools"><select id="ast"><option value="all">كل المراحل</option>${STAGES.map(s=>`<option ${s===AQ.stage?"selected":""}>${s}</option>`).join("")}<option value="" ${AQ.stage===""?"selected":""}>مرحلة غير محددة</option></select>
+    <select id="asu"><option value="">كل طلاب النطاق (${studs.length})</option>${studs.map(u=>`<option value="${u.id}" ${String(u.id)===AQ.user?"selected":""}>${esc(u.full_name)}${u.class_name?" · "+esc(u.class_name):""}</option>`).join("")}</select>
+    ${AQ.user?'<button class="ghost" id="aback" type="button">→ رجوع للنطاق</button> <a class="ghost" href="/profile.html?id='+AQ.user+'">الملف الشخصي والإنجازات</a>':""}</div>
+    <h2 style="font-size:1.35rem">${title}</h2>
+    ${renderAnalytics(d,{scope:AQ.user?"student":"group"})}</div>`;
+  $("ast").onchange=e=>{AQ.stage=e.target.value;AQ.user="";staffAnalytics();};
+  $("asu").onchange=e=>{AQ.user=e.target.value;staffAnalytics();};
+  if(AQ.user)$("aback").onclick=()=>{AQ.user="";staffAnalytics();};
+  $("pane").querySelectorAll("[data-stu]").forEach(b=>b.onclick=()=>{AQ.user=b.dataset.stu;staffAnalytics();window.scrollTo(0,0);});
+}
+
+let RQ={q:"",cls:""};
+// Attempts saved before accounts existed: names were typed freely, so they are not linked to any account.
+async function staffLegacy(){
+  const {attempts}=await api("/api/admin/legacy");
+  const pctOfT=t=>t&&t.n?Math.round(t.c/t.n*100)+"%":"—";
+  $("pane").innerHTML=`<div class="stack"><p class="dim" style="margin:0">نتائج الاختبار الفردي التي حُفظت قبل إضافة حسابات الطلاب (${attempts.length} محاولة). الأسماء فيها كما كتبها الطلاب، وهي غير مرتبطة بالحسابات الجديدة.</p>
+  ${attempts.length?`<div class="tbl"><table><thead><tr><th>الاسم</th><th>التاريخ</th><th>الوحدات</th><th>الدرجة</th><th>النسبة</th>${UNIT_KEYS.map(k=>`<th>${esc(TOPICS[k])}</th>`).join("")}</tr></thead><tbody>
+  ${attempts.map(a=>`<tr><td>${esc(a.name)}</td><td>${fmt(a.created_at)}</td><td>${esc(unitsLabel(a.units))}</td><td>${a.correct} / ${a.total}</td>
+    <td class="pct" style="color:${pctColor(a.pct)}">${a.pct}%</td>${UNIT_KEYS.map(k=>`<td>${pctOfT(a.by_topic&&a.by_topic[k])}</td>`).join("")}</tr>`).join("")}
+  </tbody></table></div>`:'<div class="tbl"><div class="empty">لا توجد نتائج قديمة.</div></div>'}</div>`;
+}
+
+async function staffResults(){
+  const {results}=await api("/api/admin/results");
+  const classes=[...new Set(results.map(r=>r.class_name).filter(Boolean))].sort();
+  const draw=()=>{
+    const q=RQ.q.toLowerCase();
+    const rows=results.filter(r=>(!RQ.cls||r.class_name===RQ.cls)&&(!q||r.full_name.toLowerCase().includes(q)||r.username.toLowerCase().includes(q)));
+    $("list").innerHTML=statsHTML(rows)+resultsTable(rows,true);
+    $("list").querySelectorAll("[data-delres]").forEach(b=>b.onclick=async()=>{if(!confirm("حذف هذه الدرجة؟"))return;await api("/api/admin/results/"+b.dataset.delres,{method:"DELETE"});staffResults();});
+  };
+  $("pane").innerHTML=`<div style="display:flex;flex-direction:column;gap:14px">
+   <div class="tools"><input id="q" placeholder="ابحث باسم الطالب" value="${esc(RQ.q)}">
+   <select id="cls"><option value="">كل الصفوف</option>${classes.map(c=>`<option ${c===RQ.cls?"selected":""}>${esc(c)}</option>`).join("")}</select>
+   <a class="ghost" href="/api/admin/results.csv">تصدير CSV</a></div><div id="list" style="display:flex;flex-direction:column;gap:14px"></div></div>`;
+  $("q").oninput=e=>{RQ.q=e.target.value;draw();};
+  $("cls").onchange=e=>{RQ.cls=e.target.value;draw();};
+  draw();
+}
+
+async function staffUsers(){
+  const {users}=await api("/api/admin/users");
+  const admin=ME.role==="admin";
+  $("pane").innerHTML=`<div style="display:flex;flex-direction:column;gap:14px">
+  <form class="panel" id="add"><h3>إضافة مستخدم</h3><div class="grid2">
+    <div class="field"><label>الاسم الكامل</label><input name="full_name" required></div>
+    <div class="field"><label>اسم المستخدم</label><input name="username" required dir="ltr"></div>
+    <div class="field"><label>كلمة المرور</label><input name="password" required dir="ltr"></div>
+    <div class="field"><label>الصف / الشعبة</label><input name="class_name"></div>
+    <div class="field"><label>المرحلة</label><select name="stage"><option value="">—</option>${STAGES.map(s=>`<option>${s}</option>`).join("")}</select></div>
+    <div class="field"><label>الصلاحية</label><select name="role"><option value="student">طالب</option>${admin?'<option value="teacher">معلم</option><option value="admin">مدير النظام</option>':""}</select></div>
+  </div><div class="msg" id="addMsg"></div><button class="primary" type="submit">إضافة</button></form>
+  <div class="tbl"><table><thead><tr><th>الاسم</th><th>المستخدم</th><th>المرحلة</th><th>الصف</th><th>الصلاحية</th><th>المحاولات</th><th>أفضل نسبة</th><th>الإنجازات</th><th></th></tr></thead><tbody>
+  ${users.map(u=>`<tr><td>${u.role==="student"?`<a class="link" href="/profile.html?id=${u.id}">${esc(u.full_name)}</a>`:esc(u.full_name)}</td><td dir="ltr" style="text-align:end">${esc(u.username)}</td>
+    <td>${u.role==="student"&&u.id!==ME.id?`<select class="mini" data-stage="${u.id}"><option value="">—</option>${STAGES.map(s=>`<option ${s===u.stage?"selected":""}>${s}</option>`).join("")}</select>`:esc(u.stage||"—")}</td><td>${esc(u.class_name||"—")}</td><td>${ROLES[u.role]}</td>
+    <td>${u.attempts}</td><td>${u.best==null?"—":u.best+"%"}</td><td>${u.role==="student"?"🏅 "+u.badges:"—"}</td>
+    <td style="white-space:nowrap">${u.id!==ME.id&&(admin||u.role==="student")?`<button class="mini" data-pw="${u.id}">كلمة مرور</button> <button class="mini danger" data-del="${u.id}">حذف</button>`:""}</td></tr>`).join("")}
+  </tbody></table></div></div>`;
+  $("add").onsubmit=async e=>{e.preventDefault();const fd=Object.fromEntries(new FormData(e.target));
+    try{await api("/api/admin/users",{method:"POST",body:JSON.stringify(fd)});staffUsers();}
+    catch(err){$("addMsg").style.color="var(--wrong)";$("addMsg").textContent=err.message;}};
+  $("pane").querySelectorAll("[data-stage]").forEach(sel=>sel.onchange=async()=>{
+    try{await api("/api/admin/users/"+sel.dataset.stage,{method:"PATCH",body:JSON.stringify({stage:sel.value})});}catch(err){alert(err.message);}});
+  $("pane").querySelectorAll("[data-pw]").forEach(b=>b.onclick=async()=>{const p=prompt("كلمة المرور الجديدة (6 أحرف على الأقل):");if(!p)return;
+    try{await api("/api/admin/users/"+b.dataset.pw,{method:"PATCH",body:JSON.stringify({password:p})});alert("تم تغيير كلمة المرور");}catch(err){alert(err.message);}});
+  $("pane").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{if(!confirm("حذف المستخدم وكل درجاته؟"))return;
+    try{await api("/api/admin/users/"+b.dataset.del,{method:"DELETE"});staffUsers();}catch(err){alert(err.message);}});
+}
+
+boot("dashboard",{staffOnly:true}).then(staff).catch(()=>{});
+</script>
+</body>
+</html>
