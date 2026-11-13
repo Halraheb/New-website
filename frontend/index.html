@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>الاختبار · تحصيلي فيزياء 2</title>
+<title>الاختبار · تحصيلي الفيزياء</title>
 <script>try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
@@ -197,7 +197,7 @@ footer{color:var(--muted);font-size:.8rem;padding-block:18px 28px}
   <div class="wrap">
     <div>
       <div class="school">مدرسة الخويلدية الثانوية</div>
-      <h1>تحصيلي <span>فيزياء 2</span></h1>
+      <h1>تحصيلي <span>الفيزياء</span></h1>
     </div>
     <div class="credits">
       <div><small>إعداد</small><b>الأستاذ حسن الراهب</b></div>
@@ -222,7 +222,9 @@ footer{color:var(--muted);font-size:.8rem;padding-block:18px 28px}
     </div>
     <div class="teams" id="teamInputs"></div>
     <p class="count" id="soloField" hidden>تُحفظ نتيجتك في حسابك، وتظهر في <a href="/profile.html">ملفك وإنجازاتك</a>.</p>
-    <h2 style="margin-top:8px">اختر الوحدة</h2>
+    <h2 style="margin-top:8px">الصف</h2>
+    <div class="chips" id="gradeChips" role="group" aria-label="الصف الدراسي" style="margin-bottom:14px"></div>
+    <h2>اختر الوحدة</h2>
     <div class="units" id="topicChips"></div>
     <div class="actions">
       <button class="btn primary" id="startBtn">ابدأ المسابقة</button>
@@ -294,7 +296,7 @@ footer{color:var(--muted);font-size:.8rem;padding-block:18px 28px}
   </div>
 </section>
 
-<footer class="wrap">الأسئلة مختارة من تجميعات تحصيلي الفيزياء (أعوام 2020–2025).</footer>
+<footer class="wrap">أسئلة ثاني ثانوي مختارة من تجميعات تحصيلي الفيزياء (أعوام 2020–2025)، وأسئلة أول وثالث ثانوي أسئلة تدريبية على نمط التحصيلي.</footer>
 </div>
 
 <script src="/site.js"></script>
@@ -304,7 +306,20 @@ footer{color:var(--muted);font-size:.8rem;padding-block:18px 28px}
 const DEFAULT_NAMES=["فريق نيوتن","فريق كبلر","فريق أينشتاين","فريق جول"];
 const COLORS=["var(--t1)","var(--t2)","var(--t3)","var(--t4)"];
 
-let selTopics=new Set(Object.keys(TOPICS));
+// grade: 1، 2، 3، أو "all" لكل الصفوف (تحصيلي شامل). يُختار تلقائياً من مرحلة الطالب عند الدخول.
+let grade=2, selTopics=new Set(GRADES[2].units);
+const gradeUnits=g=>g==="all"?UNIT_KEYS:GRADES[g].units;
+const countOf=keys=>{const k=new Set(keys);return Q.filter(q=>k.has(q[0])).length;};
+function renderGrades(){
+  const box=$("gradeChips");box.innerHTML="";
+  for(const g of [1,2,3,"all"]){
+    const b=document.createElement("button");b.type="button";b.className="chip";
+    b.setAttribute("aria-pressed",g===grade);
+    b.textContent=`${g==="all"?"كل الصفوف":GRADES[g].name} (${countOf(gradeUnits(g))})`;
+    b.onclick=()=>{grade=g;selTopics=new Set(gradeUnits(g));renderGrades();renderChips();};
+    box.appendChild(b);
+  }
+}
 let teams=[], deck=[], idx=0, picked=-1, revealed=false, awarded=-1, tLeft=0, tMax=30, tick=null, pts=10;
 let mode="team", solo=null, answered=0, autoNext=null;
 function setMode(m){
@@ -329,17 +344,17 @@ function renderTeamInputs(){
 }
 function renderChips(){
   const box=$("topicChips");box.innerHTML="";
-  const keys=Object.keys(TOPICS), all=keys.every(k=>selTopics.has(k));
+  const keys=gradeUnits(grade), all=keys.every(k=>selTopics.has(k));
   const a=document.createElement("button");a.className="unit all";a.type="button";
   a.setAttribute("aria-pressed",all);
-  a.innerHTML=`<b>كل الوحدات</b><small>${Q.length} سؤالًا</small>`;
+  a.innerHTML=`<b>${grade==="all"?"كل الوحدات":"كل وحدات "+GRADES[grade].name}</b><small>${countOf(keys)} سؤالًا</small>`;
   a.onclick=()=>{selTopics=new Set(all?[]:keys);renderChips();};
   box.appendChild(a);
   for(const k of keys){
     const c=Q.filter(q=>q[0]===k).length;
     const b=document.createElement("button");b.className="unit";b.type="button";
     b.setAttribute("aria-pressed",selTopics.has(k)&&!all);
-    b.innerHTML=`<b>${TOPICS[k]}</b><small>${c} سؤالًا</small>`;
+    b.innerHTML=`<b>${TOPICS[k]}</b><small>${grade==="all"?GRADES[GRADE_OF[k]].name+" · ":""}${c} سؤالًا</small>`;
     b.onclick=()=>{
       if(all)selTopics=new Set([k]);
       else{selTopics.has(k)?selTopics.delete(k):selTopics.add(k);}
@@ -379,7 +394,7 @@ function start(keepTeams){
 function show(){
   clearTimeout(autoNext);
   const d=deck[idx]; picked=-1;revealed=false;awarded=-1;
-  $("qTopic").textContent=TOPICS[d.t];
+  $("qTopic").textContent=`${TOPICS[d.t]} · ${GRADES[GRADE_OF[d.t]].name}`;
   $("qCount").textContent=`السؤال ${idx+1} من ${deck.length}`;
   $("prog").style.width=((idx)/deck.length*100)+"%";
   $("qText").textContent=d.q;
@@ -567,8 +582,12 @@ document.addEventListener("keydown",e=>{
   else if(e.key==="Enter"){e.preventDefault();next();}
   else if(["1","2","3","4"].includes(e.key))pick(+e.key-1);
 });
-renderTeamInputs();renderChips();
-boot("quiz").catch(()=>{});
+renderTeamInputs();renderGrades();renderChips();
+boot("quiz").then(me=>{
+  const g={"أول ثانوي":1,"ثاني ثانوي":2,"ثالث ثانوي":3}[me.stage];
+  if(g&&g!==grade){grade=g;selTopics=new Set(gradeUnits(g));renderChips();}
+  renderGrades();
+}).catch(()=>{});
 </script>
 
 </body></html>

@@ -9,8 +9,16 @@ const COOKIE = "session";
 const PROD = process.env.NODE_ENV === "production";
 
 const STAGES = ["أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"];
-// Physics 2 units — must match TOPICS in frontend/questions.js.
-const UNITS = { g: "الجاذبية", r: "الحركة الدورانية", m: "الاتزان والدفع والزخم", w: "الشغل والطاقة", p: "القدرة والآلات", h: "الحرارة" };
+// Units of each grade, in curriculum order — must match TOPICS and GRADES in frontend/questions.js.
+const GRADE_UNITS = {
+  1: { in: "مدخل إلى علم الفيزياء", kv: "الإزاحة والسرعة والتسارع", ff: "التسارع والسقوط الحر", nw: "القوى وقوانين نيوتن", vc: "المتجهات والاحتكاك والحركة المائلة", pc: "المقذوف والحركة الدائرية" },
+  2: { g: "الجاذبية", r: "الحركة الدورانية", m: "الاتزان والدفع والزخم", w: "الشغل والطاقة", p: "القدرة والآلات", h: "الحرارة" },
+  3: { fl: "مبادئ وخصائص الموائع", wv: "الاهتزازات والموجات", dp: "دوبلر والرنين في الأعمدة", lt: "الضوء والألوان", mr: "الانعكاس والمرايا",
+       ln: "الانكسار والعدسات", if: "التداخل والحيود", es: "الكهرباء الساكنة", ef: "المجالات الكهربائية", ec: "الكهرباء التيارية",
+       ci: "الدوائر الكهربائية", mg: "المجالات والقوى المغناطيسية", rh: "قواعد اليد اليمنى", ei: "الحث الكهرومغناطيسي", em: "الكهرومغناطيسية",
+       qt: "نظرية الكم", at: "الذرة", ss: "إلكترونيات الحالة الصلبة", nu: "الفيزياء النووية" },
+};
+const UNITS = Object.assign({}, ...Object.values(GRADE_UNITS));
 const cleanStage = (s) => (STAGES.includes(s) ? s : null);
 const cleanUsername = (s) => String(s || "").trim().toLowerCase();
 const USERNAME_RE = /^[a-z0-9_.-]{3,32}$/;
@@ -43,4 +51,4 @@ function rateLimit(req, res, next) {
   a.push(now); attempts.set(key, a); next();
 }
 
-module.exports = { STAGES, UNITS, cleanStage, cleanUsername, USERNAME_RE, publicUser, wrap, setSession, clearSession, auth, staffOnly, rateLimit };
+module.exports = { STAGES, UNITS, GRADE_UNITS, cleanStage, cleanUsername, USERNAME_RE, publicUser, wrap, setSession, clearSession, auth, staffOnly, rateLimit };

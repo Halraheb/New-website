@@ -23,9 +23,11 @@ function renderAnalytics(d,{scope,showKpis=true}){
   const rated=d.byUnit.filter(r=>r.answered>=MIN_ANSWERS).map(r=>({...r,p:pctOf(r)}));
   const strong=rated.filter(r=>r.p>=STRONG).sort((a,b)=>b.p-a.p||b.answered-a.answered);
   const weak=rated.filter(r=>r.p<WEAK).sort((a,b)=>a.p-b.p||b.answered-a.answered);
-  // Every unit, weakest first; units never answered come last.
+  // Units of every grade that has answers, weakest first; units of those grades never answered come last.
   const seen=new Map(d.byUnit.map(r=>[r.unit,r]));
-  const units=UNIT_KEYS.map(k=>seen.get(k)||{unit:k,answered:0,correct:0}).sort((a,b)=>(!a.answered)-(!b.answered)||pctOf(a)-pctOf(b));
+  const grades=Object.keys(GRADES).filter(g=>GRADES[g].units.some(k=>seen.has(k)));
+  const units=grades.flatMap(g=>GRADES[g].units).map(k=>seen.get(k)||{unit:k,answered:0,correct:0}).sort((a,b)=>(!a.answered)-(!b.answered)||pctOf(a)-pctOf(b));
+  const gradeSub=k=>grades.length>1?GRADES[GRADE_OF[k]].name:"";
   const who=solo?"الطالب":"الطلاب";
   return `${showKpis?kpis(d,solo,total,right):""}
   <div class="duo">
@@ -36,7 +38,7 @@ function renderAnalytics(d,{scope,showKpis=true}){
   <p class="dim note">يُحكم على الوحدة بعد ${MIN_ANSWERS} إجابات على الأقل · قوي ≥ ${STRONG}% · ضعيف &lt; ${WEAK}%</p>
 
   <section class="card"><h3>الإتقان حسب الوحدة <small class="dim">(الأضعف أولاً)</small></h3>
-    <div class="hbars">${units.map(r=>r.answered?barRow(unitName(r.unit),r):`<div class="hrow"><span class="hl">${escA(unitName(r.unit))}</span><span class="hbar"></span><span class="hv"><small>لم تُختبر بعد</small></span></div>`).join("")}</div></section>
+    <div class="hbars">${units.map(r=>r.answered?barRow(unitName(r.unit),r,gradeSub(r.unit)):`<div class="hrow"><span class="hl">${escA(unitName(r.unit))}${gradeSub(r.unit)?`<small>${escA(gradeSub(r.unit))}</small>`:""}</span><span class="hbar"></span><span class="hv"><small>لم تُختبر بعد</small></span></div>`).join("")}</div></section>
 
   ${d.byStage&&d.byStage.length?`<section class="card"><h3>المقارنة بين المراحل</h3><div class="hbars">${d.byStage.map(r=>barRow(r.stage||"غير محدد",r,`${r.students} طالب`)).join("")}</div></section>`:""}
 
@@ -62,7 +64,7 @@ function questionsHTML(rows,solo){
   return `<div class="tbl"><table><thead><tr><th>السؤال</th><th>الوحدة</th><th>${solo?"مرات الخطأ":"نسبة الخطأ"}</th><th>الخطأ الشائع</th><th>الصحيح</th></tr></thead><tbody>
   ${rows.map(r=>{const q=Q[r.q_index]; if(!q)return "";
     const [unit,text,opts,ans]=q, wrong=r.answered-r.correct, ep=Math.round(wrong/r.answered*100);
-    return `<tr><td>${escA(text)}</td><td class="dim">${escA(unitName(unit))}</td>
+    return `<tr><td>${escA(text)}</td><td class="dim">${escA(unitName(unit))}<br><small>${escA(GRADES[GRADE_OF[unit]].name)}</small></td>
       <td class="pct">${solo?`${wrong} من ${r.answered}`:`${ep}% <small class="dim">(${wrong}/${r.answered})</small>`}</td>
       <td dir="auto">${r.common_wrong==null?"—":escA(opts[r.common_wrong])}</td>
       <td dir="auto">${escA(opts[ans])}</td></tr>`;}).join("")}

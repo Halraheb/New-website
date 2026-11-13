@@ -1,8 +1,10 @@
 // Achievements and XP levels. Everything is derived from a student's results and answers;
 // earned achievements are stored in the `achievements` table so they keep their earned date.
 const { pool } = require("./db");
-const { UNITS } = require("./lib");
-const UNIT_COUNT = Object.keys(UNITS).length;
+const { GRADE_UNITS } = require("./lib");
+const GRADE_KEYS = Object.values(GRADE_UNITS).map((g) => Object.keys(g));
+const coversAGrade = (units) => GRADE_KEYS.some((g) => g.every((u) => units.includes(u)));
+const ALL_ROUND_UNITS = 6;
 
 const TIER_XP = { bronze: 50, silver: 150, gold: 300 };
 const XP_PER_CORRECT = 10;
@@ -18,11 +20,11 @@ const DEFS = [
   { code: "quizzes_20", icon: "🏃", tier: "gold", title: "لا يتوقف", desc: "أنهِ 20 اختباراً", check: (s) => [s.attempts, 20] },
   { code: "score_80", icon: "⭐", tier: "silver", title: "متفوق", desc: "احصل على 80% أو أكثر في اختبار من 10 أسئلة فأكثر", check: (s) => [s.best10, 80] },
   { code: "perfect", icon: "💯", tier: "gold", title: "العلامة الكاملة", desc: "احصل على 100% في اختبار من 10 أسئلة فأكثر", check: (s) => [s.best10, 100] },
-  { code: "full_80", icon: "🪐", tier: "gold", title: "الاختبار الشامل", desc: "احصل على 80% في اختبار من كل الوحدات (20 سؤالاً فأكثر)", check: (s) => [s.bestFull, 80] },
+  { code: "full_80", icon: "🪐", tier: "gold", title: "الاختبار الشامل", desc: "احصل على 80% في اختبار يشمل كل وحدات صفٍّ دراسي (20 سؤالاً فأكثر)", check: (s) => [s.bestFull, 80] },
   { code: "correct_100", icon: "✅", tier: "silver", title: "مئة إجابة صحيحة", desc: "أجب 100 إجابة صحيحة", check: (s) => [s.correct, 100] },
   { code: "correct_500", icon: "🧠", tier: "gold", title: "خمسمئة إجابة صحيحة", desc: "أجب 500 إجابة صحيحة", check: (s) => [s.correct, 500] },
   { code: "unit_master", icon: "🎓", tier: "silver", title: "متقن وحدة", desc: `دقة 90% أو أكثر في وحدة واحدة (${MIN_UNIT} إجابات على الأقل)`, check: (s) => [s.bestUnit, 90] },
-  { code: "all_round", icon: "🧭", tier: "gold", title: "متكامل", desc: `دقة 75% أو أكثر في الوحدات الست (${MIN_UNIT} إجابات على الأقل في كل وحدة)`, check: (s) => [s.strongUnits, UNIT_COUNT] },
+  { code: "all_round", icon: "🧭", tier: "gold", title: "متكامل", desc: `دقة 75% أو أكثر في ست وحدات (${MIN_UNIT} إجابات على الأقل في كل وحدة)`, check: (s) => [s.strongUnits, ALL_ROUND_UNITS] },
   { code: "improver", icon: "📈", tier: "silver", title: "في تحسّن", desc: "ارفع نسبتك 20 نقطة عن أول اختبار", check: (s) => [s.improvement, 20] },
   { code: "streak_3", icon: "🔥", tier: "silver", title: "ثلاثة أيام متتالية", desc: "تدرّب ثلاثة أيام متتالية", check: (s) => [s.streak, 3] },
   { code: "streak_7", icon: "⚡", tier: "gold", title: "أسبوع كامل", desc: "تدرّب سبعة أيام متتالية", check: (s) => [s.streak, 7] },
@@ -51,7 +53,7 @@ async function userStats(userId) {
   return {
     attempts: r.length,
     best10: max(r.filter((x) => x.total >= 10).map((x) => x.percent)),
-    bestFull: max(r.filter((x) => x.total >= 20 && x.units.length === UNIT_COUNT).map((x) => x.percent)),
+    bestFull: max(r.filter((x) => x.total >= 20 && coversAGrade(x.units)).map((x) => x.percent)),
     correct: totals.c,
     answered: totals.n,
     bestUnit: max(rated.map(pct)),

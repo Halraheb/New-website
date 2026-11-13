@@ -1,6 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
-const { UNITS, wrap, auth, staffOnly } = require("../lib");
+const { UNITS, GRADE_UNITS, wrap, auth, staffOnly } = require("../lib");
 const { evaluate } = require("../achievements");
 
 const router = express.Router();
@@ -53,7 +53,13 @@ router.get("/admin/results", auth, staffOnly, wrap(async (req, res) => {
 router.get("/admin/results.csv", auth, staffOnly, wrap(async (req, res) => {
   const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [["الطالب", "اسم المستخدم", "الصف", "الدرجة", "من", "النسبة", "الوحدات", "التاريخ"].map(q).join(",")];
-  const unitsLabel = (u) => (!u.length || u.length === Object.keys(UNITS).length ? "كل الوحدات" : u.map((k) => UNITS[k]).join("، "));
+  const gradeName = { 1: "أول ثانوي", 2: "ثاني ثانوي", 3: "ثالث ثانوي" };
+  const unitsLabel = (u) => {
+    if (!u.length || u.length === Object.keys(UNITS).length) return "كل الوحدات";
+    const full = Object.entries(GRADE_UNITS).filter(([, g]) => Object.keys(g).every((k) => u.includes(k)));
+    if (full.length && full.reduce((n, [, g]) => n + Object.keys(g).length, 0) === u.length) return full.map(([k]) => "كل وحدات " + gradeName[k]).join(" و");
+    return u.map((k) => UNITS[k]).join("، ");
+  };
   for (const r of (await pool.query(ALL_RESULTS)).rows)
     lines.push([r.full_name, r.username, r.class_name, r.score, r.total, r.percent + "%", unitsLabel(r.units), r.created_at.toISOString()].map(q).join(","));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");

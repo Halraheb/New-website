@@ -197,9 +197,9 @@ async function staffLegacy(title,sub){
   const {attempts}=await api("/api/admin/legacy");
   const pctOfT=t=>t&&t.n?Math.round(t.c/t.n*100)+"%":"—";
   $("pane").innerHTML=`${head(title,`${attempts.length} محاولة حُفظت قبل إضافة حسابات الطلاب. الأسماء كما كتبها الطلاب، وهي غير مرتبطة بالحسابات.`)}
-  ${attempts.length?`<div class="tbl"><table><thead><tr><th>الاسم</th><th>التاريخ</th><th>الوحدات</th><th>الدرجة</th><th>النسبة</th>${UNIT_KEYS.map(k=>`<th>${esc(TOPICS[k])}</th>`).join("")}</tr></thead><tbody>
+  ${attempts.length?`<div class="tbl"><table><thead><tr><th>الاسم</th><th>التاريخ</th><th>الوحدات</th><th>الدرجة</th><th>النسبة</th>${GRADES[2].units.map(k=>`<th>${esc(TOPICS[k])}</th>`).join("")}</tr></thead><tbody>
   ${attempts.map(a=>`<tr><td><bdi>${esc(a.name)}</bdi></td><td>${fmtDate(a.created_at)}</td><td>${esc(unitsLabel(a.units))}</td><td>${a.correct} من ${a.total}</td>
-    <td class="pct">${a.pct}%</td>${UNIT_KEYS.map(k=>`<td>${pctOfT(a.by_topic&&a.by_topic[k])}</td>`).join("")}</tr>`).join("")}
+    <td class="pct">${a.pct}%</td>${GRADES[2].units.map(k=>`<td>${pctOfT(a.by_topic&&a.by_topic[k])}</td>`).join("")}</tr>`).join("")}
   </tbody></table></div>`:emptyHTML("لا توجد نتائج قديمة","لم يُحفظ أي اختبار قبل إضافة الحسابات.")}`;
 }
 
