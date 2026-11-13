@@ -315,7 +315,7 @@ function renderGrades(){
   for(const g of [1,2,3,"all"]){
     const b=document.createElement("button");b.type="button";b.className="chip";
     b.setAttribute("aria-pressed",g===grade);
-    b.textContent=`${g==="all"?"كل الصفوف":GRADES[g].name} (${countOf(gradeUnits(g))})`;
+    b.textContent=`${g==="all"?"الكل":GRADES[g].name} (${countOf(gradeUnits(g))})`;
     b.onclick=()=>{grade=g;selTopics=new Set(gradeUnits(g));renderGrades();renderChips();};
     box.appendChild(b);
   }
